@@ -2,12 +2,17 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { useEffect } from 'react';
 
+// Import DocumentMetadata type
+import type { DocumentMetadata } from '../types';
+
 interface TextEditorProps {
   content: string;
   onContentChange: (content: string) => void;
+  metadata?: DocumentMetadata;
+  isLoading?: boolean;
 }
 
-const TextEditor = ({ content, onContentChange }: TextEditorProps) => {
+const TextEditor = ({ content, onContentChange, metadata, isLoading }: TextEditorProps) => {
   const editor = useEditor({
     extensions: [StarterKit],
     content: content,
@@ -53,6 +58,26 @@ const TextEditor = ({ content, onContentChange }: TextEditorProps) => {
           • List
         </button>
       </div>
+
+      {/* Loading indicator */}
+      {isLoading && (
+        <div className="text-blue-400 text-xs mb-2">Carregando...</div>
+      )}
+
+      {/* Document stats if metadata is provided */}
+      {metadata && (
+        <div className="text-xs text-gray-400 mb-2 flex flex-wrap gap-4">
+          {metadata.word_count !== undefined && (
+            <span>Palavras: {metadata.word_count}</span>
+          )}
+          {metadata.character_count !== undefined && (
+            <span>Caracteres: {metadata.character_count}</span>
+          )}
+          {metadata.modified_at && (
+            <span>Última modificação: {new Date(metadata.modified_at).toLocaleString()}</span>
+          )}
+        </div>
+      )}
 
       {/* Área do editor */}
       <EditorContent
