@@ -113,7 +113,7 @@ fn check_command_through_cmd(full_command: &str, name: &str) -> DependencyResult
         Ok(output) => {
             let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
             let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-            let stdout_clone = stdout.clone(); 
+            let stdout_clone = stdout.clone();
             let stderr_clone = stderr.clone();
 
             println!(
