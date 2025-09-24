@@ -51,7 +51,7 @@ pub struct RecentFile {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExportOptions {
-    pub format: String, // "pdf", "epub", "docx", "html", "md"
+    pub format: String, // "md"
     pub include_metadata: bool,
     pub template: Option<String>,
 }
