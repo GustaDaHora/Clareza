@@ -1,7 +1,7 @@
 // src/services/fileService.ts
 import { invoke } from '@tauri-apps/api/core';
 
-// Type definitions matching Rust structs
+// Type definitions should be matching Rust structs
 export interface DocumentMetadata {
   id: string;
   title: string;
@@ -37,12 +37,6 @@ export interface RecentFile {
   exists: boolean;
 }
 
-export interface ExportOptions {
-  format: 'pdf' | 'epub' | 'docx' | 'html' | 'md';
-  include_metadata: boolean;
-  template?: string;
-}
-
 export class FileService {
   /**
    * Create a new document with metadata
@@ -69,16 +63,12 @@ export class FileService {
   /**
    * Save document to existing path
    */
-  static async saveDocument(
-    path: string,
-    content: string,
-    metadata?: DocumentMetadata
-  ): Promise<FileOperation> {
+  static async saveDocument(path: string, content: string, metadata?: DocumentMetadata): Promise<FileOperation> {
     try {
       return await invoke<FileOperation>('save_document', {
         path,
         content,
-        metadata: metadata || null,
+        ...(metadata ? { metadata } : {}),
       });
     } catch (error) {
       throw new Error(`Failed to save document: ${error}`);
@@ -91,13 +81,13 @@ export class FileService {
   static async saveDocumentAs(
     content: string,
     suggestedName?: string,
-    metadata?: DocumentMetadata
+    metadata?: DocumentMetadata,
   ): Promise<FileOperation> {
     try {
       return await invoke<FileOperation>('save_document_as', {
         content,
         suggested_name: suggestedName || null,
-        metadata: metadata || null,
+        ...(metadata ? { metadata } : {}),
       });
     } catch (error) {
       throw new Error(`Failed to save document as: ${error}`);
@@ -120,8 +110,8 @@ export class FileService {
    */
   static async listBackups(originalPath: string): Promise<BackupInfo[]> {
     try {
-      return await invoke<BackupInfo[]>('list_backups', { 
-        original_path: originalPath 
+      return await invoke<BackupInfo[]>('list_backups', {
+        original_path: originalPath,
       });
     } catch (error) {
       throw new Error(`Failed to list backups: ${error}`);
@@ -131,10 +121,7 @@ export class FileService {
   /**
    * Restore a document from backup
    */
-  static async restoreBackup(
-    backupPath: string,
-    targetPath: string
-  ): Promise<FileOperation> {
+  static async restoreBackup(backupPath: string, targetPath: string): Promise<FileOperation> {
     try {
       return await invoke<FileOperation>('restore_backup', {
         backup_path: backupPath,
@@ -145,22 +132,19 @@ export class FileService {
     }
   }
 
-  /**
-   * Export document to different formats
-   */
-  static async exportDocument(
-    content: string,
-    options: ExportOptions,
-    outputPath: string
-  ): Promise<FileOperation> {
+  static async getDocumentVersions(path: string): Promise<string[]> {
     try {
-      return await invoke<FileOperation>('export_document', {
-        content,
-        options,
-        output_path: outputPath,
-      });
+      return await invoke<string[]>('get_document_versions', { path });
     } catch (error) {
-      throw new Error(`Failed to export document: ${error}`);
+      throw new Error(`Failed to get document versions: ${error}`);
+    }
+  }
+
+  static async getDocumentVersion(path: string, version: string): Promise<FileOperation> {
+    try {
+      return await invoke<FileOperation>('get_document_version', { path, version });
+    } catch (error) {
+      throw new Error(`Failed to get document version: ${error}`);
     }
   }
 
@@ -181,7 +165,7 @@ export class FileService {
   static async validatePath(path: string): Promise<boolean> {
     try {
       return await invoke<boolean>('validate_path', { path });
-    } catch (error) {
+    } catch {
       return false;
     }
   }
