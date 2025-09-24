@@ -112,9 +112,9 @@ export default function DependencyCheckScreen({ onComplete }: DependencyCheckScr
           if (!result.installed && depName.toLowerCase().includes('gemini')) {
             setShowError(true);
           }
-        } catch (err: any) {
+        } catch (err: unknown) {
           setDependencies((prev) =>
-            prev.map((d) => (d.name === check.name ? { ...d, status: 'missing', error: err.message } : d)),
+            prev.map((d) => (d.name === check.name ? { ...d, status: 'missing', error: (err as Error).message } : d)),
           );
           if (check.name.toLowerCase().includes('gemini')) {
             setShowError(true);
