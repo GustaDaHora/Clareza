@@ -6,17 +6,25 @@
   "permissions": [
     "fs:default",
     {
-      "identifier": "fs:scope", 
+      "identifier": "fs:scope",
       "allow": [
-        { "path": "$HOME/Documents/Clareza/**/*" },
-        { "path": "$APPDATA/Clareza/**/*" }
+        {
+          "path": "$HOME/Documents/Clareza/**/*"
+        },
+        {
+          "path": "$APPDATA/Clareza/**/*"
+        }
       ]
     },
     {
-      "identifier": "fs:allow-write", 
+      "identifier": "fs:allow-write",
       "allow": [
-        { "path": "$HOME/Documents/Clareza/**" }
+        {
+          "path": "$HOME/Documents/Clareza/**"
+        }
       ]
-    }
+    },
+    "dialog:allow-open",
+    "dialog:allow-save"
   ]
 }
