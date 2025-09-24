@@ -1,43 +1,43 @@
-"use client"
+'use client';
 
-import { useState } from "react"
-import { X } from "lucide-react"
+import { useState } from 'react';
+import { X } from 'lucide-react';
 
 interface NewDocumentModalProps {
-  isOpen: boolean
-  onClose: () => void
-  onCreateDocument: (data: NewDocumentData) => void
+  isOpen: boolean;
+  onClose: () => void;
+  onCreateDocument: (data: NewDocumentData) => void;
 }
 
 export interface NewDocumentData {
-  title: string
-  authors: string
+  title: string;
+  authors: string;
   // language: string
-  description: string
-  keywords: string
+  description: string;
+  keywords: string;
 }
 
 export default function NewDocumentModal({ isOpen, onClose, onCreateDocument }: NewDocumentModalProps) {
   const [newDocumentData, setNewDocumentData] = useState<NewDocumentData>({
-    title: "",
-    authors: "",
+    title: '',
+    authors: '',
     // language: "",
-    description: "",
-    keywords: "",
-  })
+    description: '',
+    keywords: '',
+  });
 
   const handleCreateDocument = () => {
-    onCreateDocument(newDocumentData)
+    onCreateDocument(newDocumentData);
     setNewDocumentData({
-      title: "",
-      authors: "",
+      title: '',
+      authors: '',
       // language: "",
-      description: "",
-      keywords: "",
-    })
-  }
+      description: '',
+      keywords: '',
+    });
+  };
 
-  if (!isOpen) return null
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -125,5 +125,5 @@ export default function NewDocumentModal({ isOpen, onClose, onCreateDocument }: 
         </div>
       </div>
     </div>
-  )
+  );
 }
