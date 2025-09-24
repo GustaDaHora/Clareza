@@ -5,24 +5,19 @@ import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import ToastNotifications from './components/ToastNotifications';
 import TextEditor from './components/Editor';
-import NewDocumentModal from './components/NewDocumentModal';
-import ExportModal from './components/ExportModal';
+
 import DependencyCheckScreen from './components/DependencyCheck';
 import { useFileHandler } from './hooks/useFileHandler';
 import { useToast } from './hooks/useToast';
 import { TOOLS, DEFAULT_CONTENT } from './constants';
-import { NewDocumentData, ExportData } from './types';
 
 export default function ClarezaApp() {
   const [currentScreen, setCurrentScreen] = useState<'dependencies' | 'editor'>('dependencies');
   const [selectedTool, setSelectedTool] = useState<string | null>(null);
   const [customPrompt, setCustomPrompt] = useState('');
-  const [currentVersion, setCurrentVersion] = useState(1);
-  const [maxVersion] = useState(3);
-  const [showExportMenu, setShowExportMenu] = useState(false);
-  const [showNewDocumentModal, setShowNewDocumentModal] = useState(false);
-  const [showExportModal, setShowExportModal] = useState(false);
-  const [selectedExportFormat, setSelectedExportFormat] = useState<string>('');
+
+  const [showAutoSaveIndicator, setShowAutoSaveIndicator] = useState(false);
+
   const [editorContent, setEditorContent] = useState(DEFAULT_CONTENT);
 
   const {
@@ -31,27 +26,35 @@ export default function ClarezaApp() {
     metadata,
     isLoading,
     lastAutoSave,
-    createNewDocument,
     openFile,
     saveFile,
     createBackup,
-    exportDocument,
+    versions,
+    currentVersionIndex,
+    goToPreviousVersion,
+    goToNextVersion,
     setContentChanged,
   } = useFileHandler();
-  
+
   const { toasts, addToast, removeToast } = useToast();
 
   // Handle keyboard shortcuts
+  useEffect(() => {
+    if (lastAutoSave) {
+      setShowAutoSaveIndicator(true);
+      const timer = setTimeout(() => {
+        setShowAutoSaveIndicator(false);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [lastAutoSave]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (currentScreen !== 'editor') return;
 
       if (e.ctrlKey || e.metaKey) {
         switch (e.key) {
-          case 'n':
-            e.preventDefault();
-            handleNewDocument();
-            break;
           case 'o':
             e.preventDefault();
             handleOpen();
@@ -77,64 +80,18 @@ export default function ClarezaApp() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentScreen]);
 
-  const handlePreviousVersion = () => {
-    if (currentVersion > 1) {
-      setCurrentVersion(currentVersion - 1);
+  const handlePreviousVersion = async () => {
+    const content = await goToPreviousVersion();
+    if (content !== undefined) {
+      setEditorContent(content);
     }
   };
 
-  const handleNextVersion = () => {
-    if (currentVersion < maxVersion) {
-      setCurrentVersion(currentVersion + 1);
+  const handleNextVersion = async () => {
+    const content = await goToNextVersion();
+    if (content !== undefined) {
+      setEditorContent(content);
     }
-  };
-
-  const handleExport = (format: string) => {
-    setSelectedExportFormat(format);
-    setShowExportModal(true);
-    setShowExportMenu(false);
-  };
-
-  const handleCreateDocument = async (data: NewDocumentData) => {
-    try {
-      const result = await createNewDocument(data.title || 'New Document');
-      
-      if (result.success) {
-        setEditorContent(result.content || DEFAULT_CONTENT);
-        setShowNewDocumentModal(false);
-        addToast('Novo documento criado', 'success');
-      } else {
-        addToast(`Erro ao criar documento: ${result.message}`, 'error');
-      }
-    } catch (error) {
-      console.error('Failed to create document:', error);
-      addToast(`Falha ao criar documento: ${error instanceof Error ? error.message : 'Erro desconhecido'}`, 'error');
-    }
-  };
-
-  const handleConfirmExport = async (data: ExportData) => {
-    try {
-      // Get export format from modal data or use selected format
-      const format = data.format || selectedExportFormat;
-      const outputPath = data.outputPath || `document.${format}`;
-      
-      const result = await exportDocument(editorContent, format as any, outputPath);
-      
-      if (result.success) {
-        addToast(`Documento exportado: ${result.path}`, 'success');
-      } else {
-        addToast(`Erro na exportação: ${result.message}`, 'error');
-      }
-    } catch (error) {
-      console.error('Failed to export document:', error);
-      addToast(`Falha na exportação: ${error instanceof Error ? error.message : 'Erro desconhecido'}`, 'error');
-    } finally {
-      setShowExportModal(false);
-    }
-  };
-
-  const handleDependenciesComplete = () => {
-    setCurrentScreen('editor');
   };
 
   const showUnsavedChangesDialog = async (): Promise<boolean> => {
@@ -144,12 +101,8 @@ export default function ClarezaApp() {
     });
   };
 
-  const handleNewDocument = async () => {
-    if (isDirty) {
-      const shouldContinue = await showUnsavedChangesDialog();
-      if (!shouldContinue) return;
-    }
-    setShowNewDocumentModal(true);
+  const handleDependenciesComplete = () => {
+    setCurrentScreen('editor');
   };
 
   const handleOpen = async () => {
@@ -159,13 +112,13 @@ export default function ClarezaApp() {
     }
 
     try {
-      // In a real implementation, you'd show a file dialog here
-      // For now, we'll need to modify this to work with your file dialog system
-      const filePath = await showOpenFileDialog(); // You'll need to implement this
-      
+      const filePath = await showOpenFileDialog();
+      console.log('Selected file path:', filePath);
+
       if (filePath) {
         const result = await openFile(filePath);
-        
+        console.log('Open file result:', result);
+
         if (result.success && result.content !== undefined) {
           setEditorContent(result.content);
           addToast(result.message, 'success');
@@ -235,10 +188,28 @@ export default function ClarezaApp() {
 
   // Placeholder for file dialog - you'll need to implement this based on your needs
   const showOpenFileDialog = async (): Promise<string | null> => {
-    // This should integrate with Tauri's file dialog or your existing dialog system
-    // For now, returning null as a placeholder
-    console.log('File dialog would open here');
-    return null;
+    try {
+      const selected = await open({
+        multiple: false,
+        filters: [
+          {
+            name: 'Markdown',
+            extensions: ['md'],
+          },
+        ],
+      });
+      if (Array.isArray(selected)) {
+        return null;
+      } else if (selected === null) {
+        return null;
+      } else {
+        return selected;
+      }
+    } catch (error) {
+      console.error('Failed to open file dialog:', error);
+      addToast(`Falha ao abrir o seletor de arquivos: ${error instanceof Error ? error.message : 'Erro desconhecido'}`, 'error');
+      return null;
+    }
   };
 
   if (currentScreen === 'dependencies') {
@@ -246,50 +217,34 @@ export default function ClarezaApp() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 flex flex-col">
+    <div className="h-screen bg-gray-900 flex flex-col overflow-hidden">
       <Header
         currentFilePath={currentFilePath}
         isDirty={isDirty}
-        currentVersion={currentVersion}
-        maxVersion={maxVersion}
+        currentVersion={currentVersionIndex + 1}
+        maxVersion={versions.length}
         isLoading={isLoading}
         onPreviousVersion={handlePreviousVersion}
         onNextVersion={handleNextVersion}
-        onNewDocument={handleNewDocument}
+
         onOpen={handleOpen}
         onSave={handleSave}
         onSaveAs={handleSaveAs}
-        onExport={handleExport}
-        showExportMenu={showExportMenu}
-        setShowExportMenu={setShowExportMenu}
         // Additional props for the new features
         metadata={metadata}
         lastAutoSave={lastAutoSave}
         onCreateBackup={handleCreateBackup}
       />
       <ToastNotifications toasts={toasts} removeToast={removeToast} />
-      
+
       {/* Auto-save indicator */}
-      {lastAutoSave && (
+      {showAutoSaveIndicator && lastAutoSave && (
         <div className="bg-blue-600 text-white text-xs px-3 py-1 text-center">
           Auto-salvo em {lastAutoSave.toLocaleTimeString()}
         </div>
       )}
-      
-      <NewDocumentModal
-        isOpen={showNewDocumentModal}
-        onClose={() => setShowNewDocumentModal(false)}
-        onCreateDocument={handleCreateDocument}
-      />
-      <ExportModal
-        isOpen={showExportModal}
-        onClose={() => setShowExportModal(false)}
-        selectedFormat={selectedExportFormat}
-        onConfirmExport={handleConfirmExport}
-        // Pass metadata for export options
-        metadata={metadata}
-      />
-      <div className="flex flex-1">
+
+      <div className="flex flex-1 overflow-hidden">
         <Sidebar
           tools={TOOLS}
           selectedTool={selectedTool}
@@ -301,10 +256,10 @@ export default function ClarezaApp() {
           metadata={metadata}
           currentFilePath={currentFilePath}
         />
-        <main className="flex-1" role="main">
-          <div className="w-full h-full min-h-[500px] bg-gray-800">
-            <TextEditor 
-              content={editorContent} 
+        <main className="flex-1 overflow-hidden" role="main">
+          <div className="w-full h-full bg-gray-800">
+            <TextEditor
+              content={editorContent}
               onContentChange={handleContentChange}
               // Pass metadata for editor features
               metadata={metadata}
