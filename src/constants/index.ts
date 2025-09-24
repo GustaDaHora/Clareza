@@ -1,14 +1,5 @@
 // src/constants/index.ts
-import {
-  CheckCircle,
-  Wand2,
-  Volume2,
-  Minimize2,
-  Maximize2,
-  Shield,
-  Sparkles,
-  Lightbulb,
-} from 'lucide-react';
+import { CheckCircle, Wand2, Volume2, Minimize2, Maximize2, Shield, Sparkles, Lightbulb } from 'lucide-react';
 import { Tool } from '../types';
 
 export const TOOLTIP_DELAY = 1000;
