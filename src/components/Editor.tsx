@@ -1,6 +1,8 @@
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { useEffect } from 'react';
+import htm from 'html-to-md';
+import { marked } from 'marked';
 
 // Import DocumentMetadata type
 import type { DocumentMetadata } from '../types';
@@ -15,22 +17,22 @@ interface TextEditorProps {
 const TextEditor = ({ content, onContentChange, metadata, isLoading }: TextEditorProps) => {
   const editor = useEditor({
     extensions: [StarterKit],
-    content: content,
+    content: marked(content) as string,
     onUpdate: ({ editor }) => {
-      onContentChange(editor.getHTML());
+      onContentChange(htm(editor.getHTML()));
     },
     autofocus: 'end',
   });
 
   // Update editor content when the prop changes
   useEffect(() => {
-    if (editor && editor.getHTML() !== content) {
-      editor.commands.setContent(content);
+    if (editor && htm(editor.getHTML()) !== content) {
+      editor.commands.setContent(marked(content) as string);
     }
   }, [content, editor]);
 
   return (
-    <div className="flex flex-col h-full bg-gray-900 text-white shadow-blue-950 shadow-inner p-4">
+    <div className="flex flex-col h-full bg-gray-800 text-white rounded-lg shadow-lg p-6 overflow-auto">
       {/* Toolbar simples */}
       <div className="flex space-x-2 border-b pb-2 mb-2">
         <button
@@ -60,29 +62,21 @@ const TextEditor = ({ content, onContentChange, metadata, isLoading }: TextEdito
       </div>
 
       {/* Loading indicator */}
-      {isLoading && (
-        <div className="text-blue-400 text-xs mb-2">Carregando...</div>
-      )}
+      {isLoading && <div className="text-blue-400 text-xs mb-2">Carregando...</div>}
 
       {/* Document stats if metadata is provided */}
       {metadata && (
         <div className="text-xs text-gray-400 mb-2 flex flex-wrap gap-4">
-          {metadata.word_count !== undefined && (
-            <span>Palavras: {metadata.word_count}</span>
-          )}
-          {metadata.character_count !== undefined && (
-            <span>Caracteres: {metadata.character_count}</span>
-          )}
-          {metadata.modified_at && (
-            <span>Última modificação: {new Date(metadata.modified_at).toLocaleString()}</span>
-          )}
+          {metadata.word_count !== undefined && <span>Palavras: {metadata.word_count}</span>}
+          {metadata.character_count !== undefined && <span>Caracteres: {metadata.character_count}</span>}
+          {metadata.modified_at && <span>Última modificação: {new Date(metadata.modified_at).toLocaleString()}</span>}
         </div>
       )}
 
       {/* Área do editor */}
       <EditorContent
         editor={editor}
-        className="flex-1 prose max-w-none focus:outline-none outline-none text-gray-100"
+        className="flex-1 prose prose-invert max-w-full focus:outline-none outline-none text-gray-100"
       />
     </div>
   );
