@@ -8,11 +8,7 @@ mod utils;
 mod errors;
 mod checks;
 
-use commands::{
-    create_document, open_document, save_document, save_document_as, 
-    create_backup, list_backups, restore_backup, export_document,
-    get_recent_files, validate_path
-};
+use commands::{create_document, open_document, save_document, save_document_as, create_backup, list_backups, restore_backup, get_recent_files, validate_path, get_document_versions, get_document_version};
 
 #[tauri::command]
 fn ping() -> String {
@@ -25,6 +21,7 @@ fn main() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             create_document,
             open_document,
@@ -33,7 +30,8 @@ fn main() {
             create_backup,
             list_backups,
             restore_backup,
-            export_document,
+            get_document_versions,
+            get_document_version,
             get_recent_files,
             validate_path,
             ping,
