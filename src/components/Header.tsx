@@ -3,12 +3,10 @@
 import { useState, useEffect } from 'react';
 import {
   FileText,
-  Plus,
   FolderOpen,
   Save,
   ChevronLeft,
   ChevronRight,
-  Download,
 } from 'lucide-react';
 import { TOOLTIP_DELAY } from '../constants';
 import type { DocumentMetadata } from '../types';
@@ -21,13 +19,9 @@ type HeaderProps = {
   isLoading: boolean;
   onPreviousVersion: () => void;
   onNextVersion: () => void;
-  onNewDocument: () => void;
   onOpen: () => void;
   onSave: () => void;
   onSaveAs: () => void;
-  onExport: (format: string) => void;
-  showExportMenu: boolean;
-  setShowExportMenu: (value: boolean) => void;
   metadata?: DocumentMetadata;
   lastAutoSave?: Date;
   onCreateBackup: () => void;
@@ -41,13 +35,9 @@ export default function Header({
   isLoading,
   onPreviousVersion,
   onNextVersion,
-  onNewDocument,
   onOpen,
   onSave,
   onSaveAs,
-  onExport,
-  showExportMenu,
-  setShowExportMenu,
   metadata,
   lastAutoSave,
   onCreateBackup,
@@ -89,12 +79,7 @@ export default function Header({
             <div className="flex items-center space-x-2">
               <FileText className="w-6 h-6 text-blue-400" aria-hidden="true" />
               <h1 className="text-lg font-semibold text-white">Clareza</h1>
-              {currentFilePath && (
-                <span className="text-sm text-gray-400">
-                  - {currentFilePath.split('/').pop()}
-                  {isDirty && ' *'}
-                </span>
-              )}
+
             </div>
             <div className="flex items-center space-x-2 ml-8">
               <div className="relative">
@@ -142,16 +127,16 @@ export default function Header({
               </div>
             </div>
           </div>
+          <div className="flex-1 text-center">
+            {currentFilePath && (
+              <span className="text-sm text-gray-400 font-semibold">
+                {currentFilePath.split('/').pop()}
+                {isDirty && ' *'}
+              </span>
+            )}
+          </div>
           <div className="flex items-center space-x-2">
-            <button
-              onClick={onNewDocument}
-              disabled={isLoading}
-              className="flex items-center space-x-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-md transition-colors focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-              aria-label="Novo documento (Ctrl+N)"
-            >
-              <Plus className="w-4 h-4" aria-hidden="true" />
-              <span className="text-sm">Novo</span>
-            </button>
+
             <button
               onClick={onOpen}
               disabled={isLoading}
@@ -181,51 +166,9 @@ export default function Header({
               <Save className="w-4 h-4" aria-hidden="true" />
               <span className="text-sm">Salvar Como...</span>
             </button>
-            <div className="relative">
-              <button
-                onClick={() => setShowExportMenu(!showExportMenu)}
-                className="flex items-center space-x-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-md transition-colors focus:ring-2 focus:ring-blue-500"
-                aria-label="Menu de exportação"
-                aria-expanded={showExportMenu}
-              >
-                <Download className="w-4 h-4" aria-hidden="true" />
-                <span className="text-sm">Exportar</span>
-              </button>
-              {showExportMenu && (
-                <div className="absolute right-0 top-full mt-1 w-48 bg-gray-800 border border-gray-600 rounded-md shadow-lg z-20">
-                  <div className="py-1">
-                    <button
-                      onClick={() => onExport('Markdown')}
-                      className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors focus:ring-2 focus:ring-blue-500"
-                    >
-                      Markdown (.md)
-                    </button>
-                    <button
-                      onClick={() => onExport('PDF')}
-                      className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors focus:ring-2 focus:ring-blue-500"
-                    >
-                      PDF
-                    </button>
-                    <button
-                      onClick={() => onExport('DOCX')}
-                      className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors focus:ring-2 focus:ring-blue-500"
-                    >
-                      Word (.docx)
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
         </div>
       </header>
-      {showExportMenu && (
-        <div 
-          className="fixed inset-0 z-10" 
-          onClick={() => setShowExportMenu(false)}
-          aria-hidden="true"
-        />
-      )}
     </>
   );
 }
