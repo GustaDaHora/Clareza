@@ -27,8 +27,4 @@ export type NewDocumentData = {
   title: string;
 };
 
-export type ExportData = {
-  format?: string;
-  outputPath?: string;
-  [key: string]: any;
-};
+
