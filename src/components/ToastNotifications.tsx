@@ -14,9 +14,7 @@ export default function ToastNotifications({ toasts, removeToast }: ToastNotific
         <div
           key={toast.id}
           className={`p-4 rounded-lg shadow-lg flex items-center justify-between min-w-64 ${
-            toast.type === 'error' 
-              ? 'bg-red-500 text-white' 
-              : 'bg-green-500 text-white'
+            toast.type === 'error' ? 'bg-red-500 text-white' : 'bg-green-500 text-white'
           }`}
           role="alert"
         >
