@@ -122,6 +122,16 @@ export default function DependencyCheckScreen({ onComplete }: DependencyCheckScr
         }
       }
 
+        // Se Gemini CLI estiver instalado, inicia o processo
+        const geminiDep = dependencies.find(dep => dep.name === 'Gemini CLI');
+        if (geminiDep && geminiDep.status === 'installed') {
+          try {
+            await invoke('start_gemini_cli');
+            console.log('Gemini CLI iniciado com sucesso');
+          } catch (e) {
+            console.error('Falha ao iniciar Gemini CLI:', e);
+          }
+        }
       setIsChecking(false);
     };
 

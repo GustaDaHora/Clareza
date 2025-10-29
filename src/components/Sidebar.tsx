@@ -12,6 +12,7 @@ type SidebarProps = {
   onCustomPromptSubmit: () => void;
   metadata?: DocumentMetadata;
   currentFilePath?: string;
+  onToolPrompt?: () => void;
 };
 
 export default function Sidebar({
@@ -21,6 +22,7 @@ export default function Sidebar({
   customPrompt,
   setCustomPrompt,
   onCustomPromptSubmit,
+  onToolPrompt,
 }: SidebarProps) {
   return (
     <aside className="w-80 bg-gray-800 border-r border-gray-700 p-6">
@@ -32,7 +34,12 @@ export default function Sidebar({
             return (
               <div key={tool.id} className="group relative" role="listitem">
                 <button
-                  onClick={() => setSelectedTool(selectedTool === tool.id ? null : tool.id)}
+                  onClick={() => {
+                    setSelectedTool(selectedTool === tool.id ? null : tool.id);
+                    if (selectedTool !== tool.id && onToolPrompt) {
+                      onToolPrompt();
+                    }
+                  }}
                   className={`w-full flex items-center space-x-3 p-3 rounded-lg text-left transition-colors focus:ring-2 focus:ring-blue-500 focus:outline-none ${
                     selectedTool === tool.id
                       ? 'bg-blue-900/50 text-blue-300 border border-blue-700'

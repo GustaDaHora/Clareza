@@ -1,5 +1,6 @@
 'use client';
 
+import { invoke } from '@tauri-apps/api/core';
 import { useState, useEffect } from 'react';
 import {
   FileText,
@@ -19,9 +20,12 @@ type HeaderProps = {
   isLoading: boolean;
   onPreviousVersion: () => void;
   onNextVersion: () => void;
+  onNew: () => void;
   onOpen: () => void;
   onSave: () => void;
   onSaveAs: () => void;
+  onOpenTerminal: () => void;
+  onToggleTerminal: () => void;
   metadata?: DocumentMetadata;
   lastAutoSave?: Date;
   onCreateBackup: () => void;
@@ -35,9 +39,12 @@ export default function Header({
   isLoading,
   onPreviousVersion,
   onNextVersion,
+  onNew,
   onOpen,
   onSave,
   onSaveAs,
+  onOpenTerminal,
+  onToggleTerminal,
   metadata,
   lastAutoSave,
   onCreateBackup,
@@ -45,9 +52,9 @@ export default function Header({
   const [showTooltip, setShowTooltip] = useState<string | null>(null);
   const [tooltipTimer, setTooltipTimer] = useState<NodeJS.Timeout | null>(null);
 
-  console.log('Header metadata:', metadata);
-  console.log("lastAutoSave:", lastAutoSave);
-  console.log("onCreateBackup:", onCreateBackup);  
+  // console.log('Header metadata:', metadata);
+  // console.log("lastAutoSave:", lastAutoSave);
+  // console.log("onCreateBackup:", onCreateBackup);  
 
   useEffect(() => {
     return () => {
@@ -164,11 +171,28 @@ export default function Header({
               aria-label="Salvar como... (Ctrl+Shift+S)"
             >
               <Save className="w-4 h-4" aria-hidden="true" />
-              <span className="text-sm">Salvar Como...</span>
+                            <span className="text-sm">Salvar Como...</span>
+                          </button>
+                                      <button
+                                        onClick={onOpenTerminal}                            className="flex items-center space-x-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-md transition-colors focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                            aria-label="Abrir terminal"
+                          >
+                <span className="text-sm">Abrir Terminal</span>
+            </button>
+            <button
+              onClick={onToggleTerminal}
+              className="flex items-center space-x-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-md transition-colors focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+              aria-label="Toggle Terminal"
+            >
+              <span className="text-sm">Toggle Terminal</span>
             </button>
           </div>
-        </div>
-      </header>
-    </>
-  );
-}
+                      </div>
+                    </header>
+                  </>
+                );
+              }
+              
+              async function handleOpenTerminal() {
+                await invoke('open_terminal');
+              }
