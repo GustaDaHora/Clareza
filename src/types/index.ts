@@ -21,6 +21,7 @@ export type Tool = {
   name: string;
   icon: LucideIcon;
   description: string;
+  prompt: string;
 };
 
 export type NewDocumentData = {
