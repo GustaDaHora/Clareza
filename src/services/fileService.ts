@@ -50,6 +50,17 @@ export class FileService {
   }
 
   /**
+   * Show open file dialog and return selected path
+   */
+  static async showOpenDialog(): Promise<FileOperation> {
+    try {
+      return await invoke<FileOperation>('show_open_dialog');
+    } catch (error) {
+      throw new Error(`Failed to show open dialog: ${error}`);
+    }
+  }
+
+  /**
    * Open an existing document from file system
    */
   static async openDocument(path: string): Promise<FileOperation> {
