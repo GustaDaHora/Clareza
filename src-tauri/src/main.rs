@@ -7,6 +7,7 @@ mod models;
 mod utils;
 mod errors;
 mod checks;
+mod gemini;
 
 use commands::{create_document, open_document, save_document, save_document_as, create_backup, list_backups, restore_backup, get_recent_files, validate_path, get_document_versions, get_document_version};
 
@@ -16,6 +17,7 @@ fn ping() -> String {
 }
 
 fn main() {
+    let _ = fix_path_env::fix();
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
@@ -35,9 +37,14 @@ fn main() {
             get_recent_files,
             validate_path,
             ping,
+            gemini::send_prompt_to_gemini,
+            commands::start_gemini_cli,
+            commands::stop_gemini_cli,
+            commands::open_terminal,
             checks::check_node,
             checks::check_npm,
-            checks::check_gemini
+            checks::check_gemini,
+            commands::debug_get_path
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

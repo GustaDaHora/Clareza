@@ -8,7 +8,7 @@ use tokio::sync::oneshot;
 
 use crate::errors::ClarezaError;
 use crate::models::{
-    BackupInfo, ClarezaDocument, DocumentMetadata, ExportOptions, FileOperation, RecentFile,
+    BackupInfo, ClarezaDocument, DocumentMetadata, FileOperation, RecentFile,
 };
 use crate::utils::{create_document_metadata, update_content_stats, FileUtils};
 
@@ -27,6 +27,48 @@ pub async fn create_document(title: String) -> Result<FileOperation, ClarezaErro
         path: None,
         content: Some(document.content),
         metadata: Some(metadata),
+    })
+}
+
+#[command]
+pub async fn show_open_dialog(window: tauri::Window) -> Result<FileOperation, ClarezaError> {
+    let (tx, rx) = oneshot::channel();
+
+    window
+        .dialog()
+        .file()
+        .add_filter("Markdown Document", &["md"])
+        .add_filter("All Files", &["*"])
+        .set_title("Open Document")
+        .pick_file(move |path_opt| {
+            let _ = tx.send(path_opt);
+        });
+
+    let path_opt = rx
+        .await
+        .map_err(|_| ClarezaError::Path("Dialog failed to respond".to_string()))?;
+
+    let Some(file_path) = path_opt else {
+        return Ok(FileOperation {
+            success: false,
+            message: "Open cancelled".to_string(),
+            path: None,
+            content: None,
+            metadata: None,
+        });
+    };
+
+    // Convert to PathBuf
+    let final_path: PathBuf = file_path
+        .into_path()
+        .map_err(|e| ClarezaError::Path(format!("Invalid file path: {}", e)))?;
+
+    Ok(FileOperation {
+        success: true,
+        message: "File selected successfully".to_string(),
+        path: Some(final_path.to_string_lossy().to_string()),
+        content: None,
+        metadata: None,
     })
 }
 
@@ -258,7 +300,43 @@ pub async fn restore_backup(
     })
 }
 
+#[command]
+pub async fn open_terminal() -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("cmd")
+            .args(&["/K", "start"])
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
 
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .args(&["-a", "Terminal", "."])
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("gnome-terminal")
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
+}
+
+#[command]
+pub async fn start_gemini_cli(app_handle: tauri::AppHandle) -> Result<(), String> {
+    crate::gemini::start_gemini(app_handle).await
+}
+
+#[command]
+pub async fn stop_gemini_cli() -> Result<(), String> {
+    crate::gemini::stop_gemini().await
+}
 
 #[command]
 pub async fn get_document_versions(path: String) -> Result<Vec<String>, ClarezaError> {
@@ -316,8 +394,15 @@ pub async fn get_recent_files() -> Result<Vec<RecentFile>, ClarezaError> {
     Ok(Vec::new())
 }
 
+use std::env;
+
 #[command]
 pub async fn validate_path(path: String) -> Result<(), ClarezaError> {
     FileUtils::safe_canonicalize(&path)?;
     Ok(())
+}
+
+#[command]
+pub fn debug_get_path() -> Result<String, String> {
+    env::var("PATH").map_err(|e| e.to_string())
 }
