@@ -1,5 +1,6 @@
 // src-tauri/src/commands.rs
 use std::path::PathBuf;
+use std::env;
 
 use chrono::Utc;
 use tauri::command;
@@ -329,16 +330,6 @@ pub async fn open_terminal() -> Result<(), String> {
 }
 
 #[command]
-pub async fn start_gemini_cli(app_handle: tauri::AppHandle) -> Result<(), String> {
-    crate::gemini::start_gemini(app_handle).await
-}
-
-#[command]
-pub async fn stop_gemini_cli() -> Result<(), String> {
-    crate::gemini::stop_gemini().await
-}
-
-#[command]
 pub async fn get_document_versions(path: String) -> Result<Vec<String>, ClarezaError> {
     let safe_path = PathBuf::from(&path);
     let versions_dir = FileUtils::get_versions_dir(&safe_path)?;
@@ -393,8 +384,6 @@ pub async fn get_recent_files() -> Result<Vec<RecentFile>, ClarezaError> {
     // For now, return empty list
     Ok(Vec::new())
 }
-
-use std::env;
 
 #[command]
 pub async fn validate_path(path: String) -> Result<(), ClarezaError> {
