@@ -5,7 +5,6 @@ import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import ToastNotifications from './components/ToastNotifications';
 import TextEditor from './components/Editor';
-
 import TerminalView from './components/TerminalView';
 import DependencyCheckScreen from './components/DependencyCheck';
 import { useFileHandler } from './hooks/useFileHandler';
@@ -19,13 +18,8 @@ export default function ClarezaApp() {
   const [selectedTool, setSelectedTool] = useState<string | null>(null);
   const [customPrompt, setCustomPrompt] = useState('');
   const [showTerminal, setShowTerminal] = useState(false);
-
   const [showAutoSaveIndicator, setShowAutoSaveIndicator] = useState(false);
-
   const [editorContent, setEditorContent] = useState(DEFAULT_CONTENT);
-
-  // Gemini response state
-  const [geminiResponse, setGeminiResponse] = useState<string | null>(null);
 
   const {
     currentFilePath,
@@ -46,7 +40,6 @@ export default function ClarezaApp() {
 
   const { toasts, addToast, removeToast } = useToast();
 
-  // Handle keyboard shortcuts
   useEffect(() => {
     if (lastAutoSave) {
       setShowAutoSaveIndicator(true);
@@ -64,7 +57,6 @@ export default function ClarezaApp() {
       if (e.ctrlKey || e.metaKey) {
         switch (e.key) {
           case 'n':
-            // Ctrl/Cmd + N for new document
             e.preventDefault();
             handleNew();
             break;
@@ -81,7 +73,6 @@ export default function ClarezaApp() {
             }
             break;
           case 'b':
-            // Ctrl/Cmd + B for backup
             e.preventDefault();
             handleCreateBackup();
             break;
@@ -152,7 +143,6 @@ export default function ClarezaApp() {
     }
 
     try {
-      // Use Tauri's open dialog through the backend
       const filePath = await showOpenFileDialog();
 
       if (filePath) {
@@ -226,7 +216,6 @@ export default function ClarezaApp() {
 
   const handleContentChange = (content: string) => {
     setEditorContent(content);
-    // This triggers auto-save and updates isDirty state
     setContentChanged(content);
   };
 
@@ -236,26 +225,48 @@ export default function ClarezaApp() {
     setCustomPrompt('');
   };
 
-  // Função para enviar prompt para Gemini CLI via Tauri
+  // Function to send prompt to Gemini CLI via Tauri
   const sendPromptToGemini = async (prompt: string) => {
+    // Show terminal if not already visible
+    if (!showTerminal) {
+      setShowTerminal(true);
+    }
+
     try {
-      const response = await invoke<string>('send_prompt_to_gemini', { prompt });
-      setGeminiResponse(response);
-      addToast('Resposta recebida do Gemini', 'success');
-      console.log('Gemini response:', response);
-      // Opcional: atualizar editor com resposta
-      setEditorContent(response);
+      // Send prompt with current editor content
+      await invoke('send_prompt_to_gemini', {
+        prompt: prompt,
+        fileContent: editorContent,
+      });
+      
+      console.log('[APP] Prompt sent to Gemini');
     } catch (error) {
-      console.error('Erro ao enviar prompt para Gemini:', error);
+      console.error('[APP] Erro ao enviar prompt para Gemini:', error);
       addToast('Erro ao enviar prompt para Gemini', 'error');
     }
   };
 
-  // Use FileService for file dialog operations instead of direct Tauri API calls
+  // Handle tool selection - send the tool's prompt with editor content
+  const handleToolPrompt = () => {
+    if (!selectedTool) return;
+
+    const tool = TOOLS.find((t) => t.id === selectedTool);
+    if (!tool) return;
+
+    // Show terminal
+    if (!showTerminal) {
+      setShowTerminal(true);
+    }
+
+    // Send the tool's prompt
+    sendPromptToGemini(tool.prompt);
+    
+    // Clear selection after sending
+    setSelectedTool(null);
+  };
+
   const showOpenFileDialog = async (): Promise<string | null> => {
     try {
-      // This will need to be implemented as a new command in your Rust backend
-      // For now, we'll use a placeholder that calls the existing pattern
       const result = await FileService.showOpenDialog();
       return result.success && result.path ? result.path : null;
     } catch (error) {
@@ -288,14 +299,12 @@ export default function ClarezaApp() {
         onSaveAs={handleSaveAs}
         onOpenTerminal={handleOpenTerminal}
         onToggleTerminal={toggleTerminal}
-        // Additional props for the new features
         metadata={metadata}
         lastAutoSave={lastAutoSave}
         onCreateBackup={handleCreateBackup}
       />
       <ToastNotifications toasts={toasts} removeToast={removeToast} />
 
-      {/* Auto-save indicator */}
       {showAutoSaveIndicator && lastAutoSave && (
         <div className="bg-blue-600 text-white text-xs px-3 py-1 text-center">
           Auto-salvo em {lastAutoSave.toLocaleTimeString()}
@@ -310,17 +319,9 @@ export default function ClarezaApp() {
           customPrompt={customPrompt}
           setCustomPrompt={setCustomPrompt}
           onCustomPromptSubmit={handleCustomPromptSubmit}
-          // Additional props for document stats
           metadata={metadata}
           currentFilePath={currentFilePath}
-          onToolPrompt={
-            selectedTool
-              ? () => {
-                  const tool = TOOLS.find((t) => t.id === selectedTool);
-                  if (tool) sendPromptToGemini(tool.prompt);
-                }
-              : undefined
-          }
+          onToolPrompt={handleToolPrompt}
         />
         <main className="flex-1 overflow-hidden" role="main">
           <div className="w-full h-full bg-gray-800 flex">
@@ -328,7 +329,6 @@ export default function ClarezaApp() {
               <TextEditor
                 content={editorContent}
                 onContentChange={handleContentChange}
-                // Pass metadata for editor features
                 metadata={metadata}
                 isLoading={isLoading}
               />
