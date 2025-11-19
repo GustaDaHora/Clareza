@@ -1,6 +1,9 @@
+// src/App.tsx
+
 'use client';
 
 import { useState, useEffect } from 'react';
+import { listen } from '@tauri-apps/api/event';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import ToastNotifications from './components/ToastNotifications';
@@ -12,6 +15,10 @@ import { useToast } from './hooks/useToast';
 import { TOOLS, DEFAULT_CONTENT } from './constants';
 import { invoke } from '@tauri-apps/api/core';
 import { FileService } from './services/fileService';
+
+interface GeminiCompletePayload {
+  content: string;
+}
 
 export default function ClarezaApp() {
   const [currentScreen, setCurrentScreen] = useState<'dependencies' | 'editor'>('dependencies');
@@ -39,6 +46,71 @@ export default function ClarezaApp() {
   } = useFileHandler();
 
   const { toasts, addToast, removeToast } = useToast();
+
+  useEffect(() => {
+    console.log('[FRONTEND] Setting up gemini-complete listener');
+    
+    let unlistenFn: (() => void) | null = null;
+
+    const setupListener = async () => {
+      try {
+        unlistenFn = await listen<GeminiCompletePayload>('gemini-complete', async (event) => {
+          console.log('[FRONTEND] ========== GEMINI COMPLETE EVENT RECEIVED ==========');
+          console.log('[FRONTEND] Full event:', JSON.stringify(event, null, 2));
+          console.log('[FRONTEND] Payload:', event.payload);
+          console.log('[FRONTEND] Content length:', event.payload?.content?.length);
+          
+          if (!event.payload || !event.payload.content) {
+            console.error('[FRONTEND] Invalid payload received:', event.payload);
+            addToast('Resposta inválida do Gemini', 'error');
+            return;
+          }
+
+          const geminiResponse = event.payload.content;
+          console.log('[FRONTEND] Content preview (first 200 chars):', geminiResponse.substring(0, 200));
+          
+          // Update editor content immediately
+          console.log('[FRONTEND] Updating editor content...');
+          setEditorContent(geminiResponse);
+          
+          // Save as new version if file exists
+          if (currentFilePath) {
+            console.log('[FRONTEND] Current file path:', currentFilePath);
+            console.log('[FRONTEND] Attempting to save as new version...');
+            
+            try {
+              const result = await saveFile(geminiResponse);
+              console.log('[FRONTEND] Save result:', result);
+              addToast('Nova versão criada com sugestões da IA', 'success');
+            } catch (error) {
+              console.error('[FRONTEND] Save error:', error);
+              addToast(`Falha ao salvar: ${error instanceof Error ? error.message : 'Erro desconhecido'}`, 'error');
+            }
+          } else {
+            console.log('[FRONTEND] No file path, marking as dirty');
+            setContentChanged(geminiResponse);
+            addToast('Conteúdo atualizado pela IA. Salve o arquivo para criar uma versão.', 'success');
+          }
+          
+          console.log('[FRONTEND] ========== PROCESSING COMPLETE ==========');
+        });
+        
+        console.log('[FRONTEND] Listener registered successfully');
+      } catch (error) {
+        console.error('[FRONTEND] Failed to setup listener:', error);
+        addToast('Falha ao configurar listener de eventos', 'error');
+      }
+    };
+
+    setupListener();
+
+    return () => {
+      if (unlistenFn) {
+        console.log('[FRONTEND] Cleaning up listener');
+        unlistenFn();
+      }
+    };
+  }, [currentFilePath, addToast]);
 
   useEffect(() => {
     if (lastAutoSave) {
@@ -225,43 +297,39 @@ export default function ClarezaApp() {
     setCustomPrompt('');
   };
 
-  // Function to send prompt to Gemini CLI via Tauri
   const sendPromptToGemini = async (prompt: string) => {
-    // Show terminal if not already visible
     if (!showTerminal) {
       setShowTerminal(true);
     }
 
     try {
-      // Send prompt with current editor content
+      console.log('[FRONTEND] Sending prompt to Gemini...');
+      console.log('[FRONTEND] Prompt:', prompt);
+      console.log('[FRONTEND] Editor content length:', editorContent.length);
+      
       await invoke('send_prompt_to_gemini', {
         prompt: prompt,
         fileContent: editorContent,
       });
       
-      console.log('[APP] Prompt sent to Gemini');
+      console.log('[FRONTEND] Prompt sent successfully');
     } catch (error) {
-      console.error('[APP] Erro ao enviar prompt para Gemini:', error);
+      console.error('[FRONTEND] Erro ao enviar prompt para Gemini:', error);
       addToast('Erro ao enviar prompt para Gemini', 'error');
     }
   };
 
-  // Handle tool selection - send the tool's prompt with editor content
   const handleToolPrompt = () => {
     if (!selectedTool) return;
 
     const tool = TOOLS.find((t) => t.id === selectedTool);
     if (!tool) return;
 
-    // Show terminal
     if (!showTerminal) {
       setShowTerminal(true);
     }
 
-    // Send the tool's prompt
     sendPromptToGemini(tool.prompt);
-    
-    // Clear selection after sending
     setSelectedTool(null);
   };
 
