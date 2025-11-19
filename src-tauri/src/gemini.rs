@@ -5,7 +5,7 @@ use std::env;
 use std::sync::Arc;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
-use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::sync::RwLock;
 use tokio::time::timeout;
 
@@ -13,6 +13,11 @@ use tokio::time::timeout;
 struct TerminalOutput {
     message: String,
     stream: String,
+}
+
+#[derive(Clone, serde::Serialize)]
+struct GeminiComplete {
+    content: String,
 }
 
 #[derive(Clone)]
@@ -24,7 +29,6 @@ static GEMINI_STATE: Lazy<GeminiState> = Lazy::new(|| GeminiState {
     current_model: Arc::new(RwLock::new("gemini-2.5-flash".to_string())),
 });
 
-/// Find the gemini executable in PATH
 fn find_gemini_executable() -> Result<String, String> {
     let path_var = env::var("PATH")
         .map_err(|_| "PATH environment variable not found".to_string())?;
@@ -48,96 +52,94 @@ fn find_gemini_executable() -> Result<String, String> {
     Err("Gemini CLI not found in PATH".to_string())
 }
 
-/// Execute a Gemini command with streaming output capture
+fn is_batch_file(path: &str) -> bool {
+    let path_lower = path.to_lowercase();
+    path_lower.ends_with(".cmd") || path_lower.ends_with(".bat")
+}
+
 async fn execute_gemini_command_streaming(
     gemini_path: &str,
     prompt: &str,
     model: Option<&str>,
     app_handle: AppHandle,
     timeout_secs: u64,
-) -> Result<(), String> {
+) -> Result<String, String> {
     println!("[GEMINI] Executing command with streaming (timeout: {}s)", timeout_secs);
-    println!("[GEMINI] Model: {:?}", model);
-    println!("[GEMINI] Prompt length: {} chars", prompt.len());
     println!("[GEMINI] Gemini path: {}", gemini_path);
+    println!("[GEMINI] Prompt length: {}", prompt.len());
     
-    // On Windows, execute .cmd files directly without cmd.exe wrapper
-    // This prevents cmd.exe from interpreting special characters in arguments
-    println!("[GEMINI] Executing directly: {}", gemini_path);
-    let mut cmd = tokio::process::Command::new(gemini_path);
+    // Build the command arguments
+    let mut args = Vec::new();
     
-    // Add model flag if specified
     if let Some(m) = model {
-        println!("[GEMINI] Adding model flag: -m {}", m);
-        cmd.arg("-m").arg(m);
+        args.push("-m".to_string());
+        args.push(m.to_string());
     }
     
-    // Use streaming JSON output format for real-time events
-    println!("[GEMINI] Adding output format: stream-json");
-    cmd.arg("--output-format").arg("stream-json");
+    args.push("--output-format".to_string());
+    args.push("stream-json".to_string());
     
-    // Use non-interactive mode with -p flag for single prompt
-    // The key fix: pass the prompt as a single argument without manual escaping
-    println!("[GEMINI] Adding prompt flag with {} chars", prompt.len());
-    cmd.arg("-p");
-    cmd.arg(prompt);  // Tokio will handle the escaping automatically
+    // On Windows, if it's a batch file, we need to use cmd.exe /C
+    let mut cmd = if cfg!(target_os = "windows") && is_batch_file(gemini_path) {
+        println!("[GEMINI] Detected batch file, using cmd.exe wrapper");
+        let mut c = tokio::process::Command::new("cmd");
+        c.arg("/C");
+        c.arg(gemini_path);
+        c
+    } else {
+        tokio::process::Command::new(gemini_path)
+    };
     
-    // Capture stdout and stderr separately
+    // Add all arguments
+    cmd.args(&args);
+    
+    // Use stdin for the prompt to avoid command line length limits
+    cmd.stdin(std::process::Stdio::piped());
     cmd.stdout(std::process::Stdio::piped());
     cmd.stderr(std::process::Stdio::piped());
     
-    println!("[GEMINI] About to spawn process...");
-    println!("[GEMINI] Command: {:?}", cmd);
-    
-    // Spawn the process
+    println!("[GEMINI] Spawning process with stdin...");
     let mut child = cmd.spawn()
-        .map_err(|e| {
-            println!("[GEMINI] Failed to spawn: {}", e);
-            format!("Failed to spawn gemini process: {}", e)
-        })?;
+        .map_err(|e| format!("Failed to spawn gemini process: {}", e))?;
     
-    println!("[GEMINI] Process spawned successfully");
+    // Write prompt to stdin
+    if let Some(mut stdin) = child.stdin.take() {
+        println!("[GEMINI] Writing prompt to stdin ({} bytes)...", prompt.as_bytes().len());
+        stdin.write_all(prompt.as_bytes()).await
+            .map_err(|e| format!("Failed to write to stdin: {}", e))?;
+        stdin.flush().await
+            .map_err(|e| format!("Failed to flush stdin: {}", e))?;
+        drop(stdin); // Close stdin to signal end of input
+        println!("[GEMINI] Stdin written and closed");
+    }
     
-    println!("[GEMINI] Attempting to take stdout handle...");
     let stdout = child.stdout.take()
-        .ok_or_else(|| {
-            println!("[GEMINI] Failed to take stdout handle");
-            "Failed to capture stdout".to_string()
-        })?;
+        .ok_or_else(|| "Failed to capture stdout".to_string())?;
     
-    println!("[GEMINI] Attempting to take stderr handle...");
     let stderr = child.stderr.take()
-        .ok_or_else(|| {
-            println!("[GEMINI] Failed to take stderr handle");
-            "Failed to capture stderr".to_string()
-        })?;
+        .ok_or_else(|| "Failed to capture stderr".to_string())?;
     
-    println!("[GEMINI] Creating buffered readers...");
     let stdout_reader = BufReader::new(stdout);
     let stderr_reader = BufReader::new(stderr);
     
     let app_handle_stdout = app_handle.clone();
     let app_handle_stderr = app_handle.clone();
     
-    println!("[GEMINI] Spawning stdout reader task...");
-    // Spawn tasks to read stdout and stderr concurrently
+    let accumulated_content = Arc::new(RwLock::new(String::new()));
+    let accumulated_content_clone = accumulated_content.clone();
+    
     let stdout_handle = tokio::spawn(async move {
-        println!("[GEMINI STDOUT TASK] Started");
         let mut lines = stdout_reader.lines();
-        let mut line_count = 0;
         while let Ok(Some(line)) = lines.next_line().await {
-            line_count += 1;
-            println!("[GEMINI STDOUT] Line {}: {}", line_count, line);
-            
-            if let Some(window) = app_handle_stdout.get_webview_window("main") {
-                // Try to parse as JSON first (stream-json format)
-                if let Ok(json) = serde_json::from_str::<serde_json::Value>(&line) {
-                    // Extract content from message events
-                    if let Some(msg_type) = json.get("type").and_then(|v| v.as_str()) {
-                        if msg_type == "message" {
-                            if let Some(role) = json.get("role").and_then(|v| v.as_str()) {
-                                if role == "assistant" {
-                                    if let Some(content) = json.get("content").and_then(|v| v.as_str()) {
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&line) {
+                if let Some(msg_type) = json.get("type").and_then(|v| v.as_str()) {
+                    if msg_type == "message" {
+                        if let Some(role) = json.get("role").and_then(|v| v.as_str()) {
+                            if role == "assistant" {
+                                if let Some(content) = json.get("content").and_then(|v| v.as_str()) {
+                                    accumulated_content_clone.write().await.push_str(content);
+                                    
+                                    if let Some(window) = app_handle_stdout.get_webview_window("main") {
                                         let _ = window.emit(
                                             "terminal-output",
                                             TerminalOutput {
@@ -150,9 +152,10 @@ async fn execute_gemini_command_streaming(
                             }
                         }
                     }
-                    
-                    // Handle error events
-                    if let Some(error) = json.get("error").and_then(|v| v.as_str()) {
+                }
+                
+                if let Some(error) = json.get("error").and_then(|v| v.as_str()) {
+                    if let Some(window) = app_handle_stdout.get_webview_window("main") {
                         let _ = window.emit(
                             "terminal-output",
                             TerminalOutput {
@@ -161,8 +164,9 @@ async fn execute_gemini_command_streaming(
                             },
                         );
                     }
-                } else {
-                    // Fallback to plain text output
+                }
+            } else {
+                if let Some(window) = app_handle_stdout.get_webview_window("main") {
                     let _ = window.emit(
                         "terminal-output",
                         TerminalOutput {
@@ -173,18 +177,11 @@ async fn execute_gemini_command_streaming(
                 }
             }
         }
-        println!("[GEMINI STDOUT TASK] Finished reading {} lines", line_count);
     });
     
-    println!("[GEMINI] Spawning stderr reader task...");
     let stderr_handle = tokio::spawn(async move {
-        println!("[GEMINI STDERR TASK] Started");
         let mut lines = stderr_reader.lines();
-        let mut line_count = 0;
         while let Ok(Some(line)) = lines.next_line().await {
-            line_count += 1;
-            println!("[GEMINI STDERR] Line {}: {}", line_count, line);
-            
             if let Some(window) = app_handle_stderr.get_webview_window("main") {
                 let _ = window.emit(
                     "terminal-output",
@@ -195,49 +192,26 @@ async fn execute_gemini_command_streaming(
                 );
             }
         }
-        println!("[GEMINI STDERR TASK] Finished reading {} lines", line_count);
     });
     
-    println!("[GEMINI] Starting to wait for process with timeout...");
-    // Wait for the process with timeout
     let wait_result = timeout(Duration::from_secs(timeout_secs), child.wait()).await;
     
-    println!("[GEMINI] Process wait completed, result: {:?}", wait_result.as_ref().map(|r| r.as_ref().map(|s| s.code())));
-    
-    // Wait for output tasks to complete
-    println!("[GEMINI] Waiting for output reader tasks to complete...");
-    let (stdout_result, stderr_result) = tokio::join!(stdout_handle, stderr_handle);
-    println!("[GEMINI] Output tasks completed - stdout: {:?}, stderr: {:?}", 
-        stdout_result.is_ok(), stderr_result.is_ok());
+    tokio::join!(stdout_handle, stderr_handle);
     
     match wait_result {
         Ok(Ok(status)) => {
-            println!("[GEMINI] Process exited with status: {} (code: {:?})", status, status.code());
-            
             if !status.success() {
-                let error_msg = format!("Gemini CLI exited with status: {}", status);
-                println!("[GEMINI] Error: {}", error_msg);
-                return Err(error_msg);
+                return Err(format!("Gemini CLI exited with status: {}", status));
             }
             
-            println!("[GEMINI] Process completed successfully");
-            Ok(())
+            let content = accumulated_content.read().await.clone();
+            println!("[GEMINI] Process completed successfully, accumulated {} chars", content.len());
+            Ok(content)
         }
-        Ok(Err(e)) => {
-            let error_msg = format!("Failed to wait for process: {}", e);
-            println!("[GEMINI] Error: {}", error_msg);
-            Err(error_msg)
-        }
+        Ok(Err(e)) => Err(format!("Failed to wait for process: {}", e)),
         Err(_) => {
-            println!("[GEMINI] Process timed out, attempting to kill...");
-            // Kill the process on timeout
-            match child.kill().await {
-                Ok(_) => println!("[GEMINI] Process killed successfully"),
-                Err(e) => println!("[GEMINI] Failed to kill process: {}", e),
-            }
-            let error_msg = format!("Command timed out after {} seconds", timeout_secs);
-            println!("[GEMINI] Error: {}", error_msg);
-            Err(error_msg)
+            let _ = child.kill().await;
+            Err(format!("Command timed out after {} seconds", timeout_secs))
         }
     }
 }
@@ -249,25 +223,25 @@ pub async fn send_prompt_to_gemini(
     file_content: Option<String>,
 ) -> Result<(), String> {
     println!("[GEMINI] Received prompt request");
+    println!("[GEMINI] Prompt length: {}", prompt.len());
     
-    // Find gemini executable
     let gemini_path = find_gemini_executable()?;
     
-    // Build full prompt with file context if provided
-    let full_prompt = if let Some(content) = file_content {
-        // Replace @file_reference with the actual content
-        // The prompt should have instruction first, then the content to process
+    let full_prompt = if let Some(content) = &file_content {
+        println!("[GEMINI] File content length: {}", content.len());
         if prompt.contains("@file_reference") {
-            prompt.replace("@file_reference", &format!("Arquivo: {}", content))
+            prompt.replace("@file_reference", &format!("\n\nConteúdo do arquivo:\n```\n{}\n```\n", content))
         } else {
-            // Fallback: append content at the end
-            format!("{} Conteúdo do arquivo: {}", prompt, content)
+            format!("{}\n\nConteúdo do arquivo atual:\n```\n{}\n```", prompt, content)
         }
     } else {
+        println!("[GEMINI] No file content provided");
         prompt.clone()
     };
     
-    // Emit user prompt to UI (show shortened version)
+    println!("[GEMINI] Full prompt length: {}", full_prompt.len());
+    println!("[GEMINI] Full prompt preview (first 200 chars): {}", &full_prompt[..full_prompt.len().min(200)]);
+    
     if let Some(window) = app_handle.get_webview_window("main") {
         let display_prompt = if prompt.len() > 100 {
             format!("{}...", &prompt[..100])
@@ -292,13 +266,16 @@ pub async fn send_prompt_to_gemini(
         );
     }
     
-    // Execute in background
     let app_handle_clone = app_handle.clone();
     let model = GEMINI_STATE.current_model.read().await.clone();
     
     tokio::spawn(async move {
+        println!("[GEMINI] Background task started");
         match execute_gemini_command_streaming(&gemini_path, &full_prompt, Some(&model), app_handle_clone.clone(), 120).await {
-            Ok(_) => {
+            Ok(complete_content) => {
+                println!("[GEMINI] Got complete content: {} chars", complete_content.len());
+                println!("[GEMINI] Content preview: {}", &complete_content[..complete_content.len().min(100)]);
+                
                 if let Some(window) = app_handle_clone.get_webview_window("main") {
                     let _ = window.emit(
                         "terminal-output",
@@ -315,9 +292,21 @@ pub async fn send_prompt_to_gemini(
                             stream: "system".to_string(),
                         },
                     );
+                    
+                    println!("[GEMINI] About to emit gemini-complete event");
+                    let payload = GeminiComplete {
+                        content: complete_content.clone(),
+                    };
+                    println!("[GEMINI] Payload content length: {}", payload.content.len());
+                    
+                    match app_handle_clone.emit("gemini-complete", payload) {
+                        Ok(_) => println!("[GEMINI] Event emitted successfully"),
+                        Err(e) => println!("[GEMINI] Failed to emit event: {:?}", e),
+                    }
                 }
             }
             Err(e) => {
+                println!("[GEMINI] Error in background task: {}", e);
                 if let Some(window) = app_handle_clone.get_webview_window("main") {
                     let _ = window.emit(
                         "terminal-output",
@@ -329,6 +318,7 @@ pub async fn send_prompt_to_gemini(
                 }
             }
         }
+        println!("[GEMINI] Background task completed");
     });
     
     Ok(())
@@ -336,7 +326,6 @@ pub async fn send_prompt_to_gemini(
 
 #[tauri::command]
 pub async fn set_gemini_model(model: String) -> Result<(), String> {
-    // Validate model name
     let valid_models = vec![
         "gemini-2.5-flash",
         "gemini-2.5-flash-lite",
