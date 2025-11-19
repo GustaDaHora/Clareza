@@ -26,6 +26,12 @@
     },
     "dialog:allow-open",
     "dialog:allow-save",
-    "shell:allow-spawn"
+    "shell:allow-spawn",
+
+    "core:default",
+    "core:event:allow-listen",
+    "core:event:allow-emit",
+    "core:event:allow-emit-to",
+    "dialog:default"
   ]
 }
