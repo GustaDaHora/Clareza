@@ -12,37 +12,13 @@ pub struct DependencyResult {
 }
 
 #[tauri::command]
-pub async fn check_node() -> DependencyResult {
-    check_command_with_fallbacks("node", &["-v"], "Node.js")
-}
-
-#[tauri::command]
-pub async fn check_npm() -> DependencyResult {
-    check_npm_internal()
-}
-
-#[tauri::command]
 pub async fn check_gemini() -> DependencyResult {
     check_gemini_internal()
 }
 
-fn check_npm_internal() -> DependencyResult {
-    // Try different approaches for npm on Windows
-    let npm_commands = vec![
-        ("npm", vec!["-v"]),
-        ("npm.cmd", vec!["-v"]),
-        ("npm.exe", vec!["-v"]),
-    ];
-
-    for (cmd, args) in npm_commands {
-        let result = check_command_internal(cmd, &args, "NPM");
-        if result.installed {
-            return result;
-        }
-    }
-
-    // If all direct approaches fail, try through cmd
-    check_command_through_cmd("npm -v", "NPM")
+#[tauri::command]
+pub async fn check_bun() -> DependencyResult {
+    check_command_with_fallbacks("bun", &["--version"], "Bun")
 }
 
 fn check_gemini_internal() -> DependencyResult {
