@@ -1,6 +1,6 @@
 // src-tauri/src/commands.rs
-use std::path::PathBuf;
 use std::env;
+use std::path::PathBuf;
 
 use chrono::Utc;
 use tauri::command;
@@ -8,9 +8,7 @@ use tauri_plugin_dialog::DialogExt;
 use tokio::sync::oneshot;
 
 use crate::errors::ClarezaError;
-use crate::models::{
-    BackupInfo, ClarezaDocument, DocumentMetadata, FileOperation, RecentFile,
-};
+use crate::models::{BackupInfo, ClarezaDocument, DocumentMetadata, FileOperation, RecentFile};
 use crate::utils::{create_document_metadata, update_content_stats, FileUtils};
 
 #[command]
@@ -147,7 +145,6 @@ pub async fn save_document(
     let timestamp = Utc::now().to_rfc3339().replace(":", "-");
     let version_path = versions_dir.join(timestamp);
     tokio::fs::write(version_path, &final_content).await?;
-
 
     Ok(FileOperation {
         success: true,
@@ -356,7 +353,9 @@ pub async fn get_document_version(
     let version_path = versions_dir.join(version);
 
     if !version_path.exists() {
-        return Err(ClarezaError::FileNotFound(version_path.to_string_lossy().to_string()));
+        return Err(ClarezaError::FileNotFound(
+            version_path.to_string_lossy().to_string(),
+        ));
     }
 
     let content = FileUtils::read_with_encoding(&version_path).await?;
@@ -380,8 +379,6 @@ pub async fn get_document_version(
 
 #[command]
 pub async fn get_recent_files() -> Result<Vec<RecentFile>, ClarezaError> {
-    // In a real implementation, you'd store recent files in app data
-    // For now, return empty list
     Ok(Vec::new())
 }
 
@@ -394,4 +391,80 @@ pub async fn validate_path(path: String) -> Result<(), ClarezaError> {
 #[command]
 pub fn debug_get_path() -> Result<String, String> {
     env::var("PATH").map_err(|e| e.to_string())
+}
+#[command]
+pub async fn install_bun() -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("cmd")
+            .args(&["/C", "start", "https://bun.sh/"])
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg("https://bun.sh/")
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open")
+            .arg("https://bun.sh/")
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
+}
+
+#[command]
+pub async fn install_gemini() -> Result<FileOperation, String> {
+    let (shell, shell_arg) = if cfg!(target_os = "windows") {
+        ("cmd", "/C")
+    } else {
+        ("sh", "-c")
+    };
+
+    // Check if Bun is installed
+    let bun_check = std::process::Command::new(shell)
+        .arg(shell_arg)
+        .arg("bun --version")
+        .output();
+
+    let use_bun = match bun_check {
+        Ok(output) => output.status.success(),
+        Err(_) => false,
+    };
+
+    let install_cmd = if use_bun {
+        "bun install -g @google/gemini-cli"
+    } else {
+        "npm install -g @google/gemini-cli"
+    };
+
+    let output = std::process::Command::new(shell)
+        .arg(shell_arg)
+        .arg(install_cmd)
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if output.status.success() {
+        Ok(FileOperation {
+            success: true,
+            message: format!(
+                "Gemini CLI installed successfully using {}",
+                if use_bun { "Bun" } else { "npm" }
+            ),
+            path: None,
+            content: None,
+            metadata: None,
+        })
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        Err(format!("Failed to install Gemini CLI: {}", stderr))
+    }
 }
