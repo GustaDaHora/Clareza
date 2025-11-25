@@ -14,12 +14,12 @@ fn ping() -> String {
     "pong".into()
 }
 
-use checks::{check_gemini, check_node, check_npm};
+use checks::{check_bun, check_gemini};
 
 use commands::{
     create_backup, create_document, debug_get_path, get_document_version, get_document_versions,
-    get_recent_files, list_backups, open_document, open_terminal, restore_backup, save_document,
-    save_document_as, show_open_dialog, validate_path,
+    get_recent_files, install_bun, install_gemini, list_backups, open_document, open_terminal,
+    restore_backup, save_document, save_document_as, show_open_dialog, validate_path,
 };
 
 use gemini::{get_gemini_model, send_prompt_to_gemini, set_gemini_model};
@@ -31,11 +31,11 @@ fn main() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_updater::init())
         .invoke_handler(tauri::generate_handler![
             // Checks
-            check_node,
-            check_npm,
             check_gemini,
+            check_bun,
             // Document commands
             create_document,
             open_document,
@@ -52,6 +52,8 @@ fn main() {
             open_terminal,
             show_open_dialog,
             debug_get_path,
+            install_gemini,
+            install_bun,
             // Gemini CLI commands
             send_prompt_to_gemini,
             set_gemini_model,
