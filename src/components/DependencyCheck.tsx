@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { CheckCircle, Circle, Download, FileText, X } from 'lucide-react';
+import { CheckCircle, Circle, Download, FileText, X, RefreshCw } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
+import { check } from '@tauri-apps/plugin-updater';
+import { relaunch } from '@tauri-apps/plugin-process';
 
 interface DependencyCheck {
   name: string;
@@ -45,14 +47,9 @@ interface DependencyCheckScreenProps {
 export default function DependencyCheckScreen({ onComplete }: DependencyCheckScreenProps) {
   const [dependencies, setDependencies] = useState<DependencyCheck[]>([
     {
-      name: 'Node.js',
+      name: 'Bun',
       status: 'checking',
-      description: 'Runtime JavaScript necessário para o backend',
-    },
-    {
-      name: 'NPM',
-      status: 'checking',
-      description: 'Gerenciador de pacotes do Node.js',
+      description: 'Runtime JavaScript rápido e gerenciador de pacotes',
     },
     {
       name: 'Gemini CLI',
@@ -62,6 +59,44 @@ export default function DependencyCheckScreen({ onComplete }: DependencyCheckScr
   ]);
   const [showError, setShowError] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
+  const [updateStatus, setUpdateStatus] = useState<{
+    checking: boolean;
+    available: boolean;
+    downloading: boolean;
+    version?: string;
+    error?: string;
+  }>({ checking: false, available: false, downloading: false });
+  // Check for updates
+  useEffect(() => {
+    const checkForUpdates = async () => {
+      setUpdateStatus({ checking: true, available: false, downloading: false });
+      try {
+        const update = await check();
+        if (update?.available) {
+          console.log(`Update available: ${update.version}`);
+          setUpdateStatus({
+            checking: false,
+            available: true,
+            downloading: false,
+            version: update.version,
+          });
+        } else {
+          setUpdateStatus({ checking: false, available: false, downloading: false });
+        }
+      } catch (error) {
+        console.error('Failed to check for updates:', error);
+        setUpdateStatus({
+          checking: false,
+          available: false,
+          downloading: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    };
+
+    checkForUpdates();
+  }, []);
+
   useEffect(() => {
     const checkDependencies = async () => {
       setIsChecking(true);
@@ -85,8 +120,7 @@ export default function DependencyCheckScreen({ onComplete }: DependencyCheckScr
       }
 
       const checks: { name: string; command: string }[] = [
-        { name: 'Node.js', command: 'check_node' },
-        { name: 'NPM', command: 'check_npm' },
+        { name: 'Bun', command: 'check_bun' },
         { name: 'Gemini CLI', command: 'check_gemini' },
       ];
 
@@ -122,16 +156,16 @@ export default function DependencyCheckScreen({ onComplete }: DependencyCheckScr
         }
       }
 
-        // Se Gemini CLI estiver instalado, inicia o processo
-        const geminiDep = dependencies.find(dep => dep.name === 'Gemini CLI');
-        if (geminiDep && geminiDep.status === 'installed') {
-          try {
-            await invoke('start_gemini_cli');
-            console.log('Gemini CLI iniciado com sucesso');
-          } catch (e) {
-            console.error('Falha ao iniciar Gemini CLI:', e);
-          }
+      // Se Gemini CLI estiver instalado, inicia o processo
+      const geminiDep = dependencies.find(dep => dep.name === 'Gemini CLI');
+      if (geminiDep && geminiDep.status === 'installed') {
+        try {
+          await invoke('start_gemini_cli');
+          console.log('Gemini CLI iniciado com sucesso');
+        } catch (e) {
+          console.error('Falha ao iniciar Gemini CLI:', e);
         }
+      }
       setIsChecking(false);
     };
 
@@ -143,9 +177,29 @@ export default function DependencyCheckScreen({ onComplete }: DependencyCheckScr
     // You can implement actual installation logic here
   };
 
+  const handleDownloadUpdate = async () => {
+    setUpdateStatus((prev) => ({ ...prev, downloading: true }));
+    try {
+      const update = await check();
+      if (update?.available) {
+        await update.downloadAndInstall();
+        await relaunch();
+      }
+    } catch (error) {
+      console.error('Failed to download and install update:', error);
+      setUpdateStatus((prev) => ({
+        ...prev,
+        downloading: false,
+        error: error instanceof Error ? error.message : 'Failed to update',
+      }));
+    }
+  };
+
+  // Can proceed if Bun and Gemini CLI are installed
   const canProceed =
     dependencies.every((dep) => dep.status === 'installed') ||
-    dependencies.filter((dep) => dep.status === 'installed').length >= 2;
+    (dependencies.find((dep) => dep.name === 'Bun')?.status === 'installed' &&
+      dependencies.find((dep) => dep.name === 'Gemini CLI')?.status === 'installed');
 
   return (
     <div className="overflow-hidden min-h-screen bg-gray-900 flex items-center justify-center">
@@ -157,6 +211,40 @@ export default function DependencyCheckScreen({ onComplete }: DependencyCheckScr
             {isChecking ? 'Verificando dependências do sistema...' : 'Verificação concluída'}
           </p>
         </div>
+
+        {/* Update notification */}
+        {updateStatus.available && (
+          <div className="mb-6 p-4 bg-blue-900/50 border border-blue-700 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <RefreshCw className="w-5 h-5 text-blue-400" />
+                <div>
+                  <p className="text-blue-300 font-medium text-sm">
+                    Atualização disponível: v{updateStatus.version}
+                  </p>
+                  <p className="text-blue-400 text-xs">Uma nova versão do Clareza está disponível</p>
+                </div>
+              </div>
+              <button
+                onClick={handleDownloadUpdate}
+                disabled={updateStatus.downloading}
+                className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {updateStatus.downloading ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Atualizando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4" />
+                    <span>Atualizar</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="space-y-4">
           {dependencies.map((dep) => (
