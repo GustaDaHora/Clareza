@@ -1,0 +1,66 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  release:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [windows-latest, ubuntu-22.04, macos-latest]
+    runs-on: ${{ matrix.platform }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Rust setup
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Install dependencies (Ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install frontend dependencies
+        run: bun install
+
+      - name: Build and Release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Clareza v__VERSION__'
+          releaseBody: |
+            ## 🎉 Nova versão do Clareza disponível!
+
+            Veja os arquivos abaixo para baixar e instalar esta versão.
+
+            ### 📦 Instalação
+            - **Windows**: Baixe o arquivo `.msi` ou `.exe`
+            - **macOS**: Baixe o arquivo `.dmg`
+            - **Linux**: Baixe o arquivo `.AppImage`, `.rpm` ou `.deb`
+
+            ### 🔄 Atualização Automática
+            Se você já tem o Clareza instalado, a atualização será detectada automaticamente na próxima inicialização.
+          releaseDraft: true
+          prerelease: false
+          includeUpdaterJson: true
