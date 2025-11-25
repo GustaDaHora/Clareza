@@ -1,6 +1,6 @@
 'use client';
 
-import { Toast } from '../../types';
+import { Toast } from '../types';
 
 type ToastNotificationsProps = {
   toasts: Toast[];
@@ -13,9 +13,8 @@ export default function ToastNotifications({ toasts, removeToast }: ToastNotific
       {toasts.map((toast) => (
         <div
           key={toast.id}
-          className={`p-4 rounded-lg shadow-lg flex items-center justify-between min-w-64 ${
-            toast.type === 'error' ? 'bg-red-500 text-white' : 'bg-green-500 text-white'
-          }`}
+          className={`p-4 rounded-lg shadow-lg flex items-center justify-between min-w-64 ${toast.type === 'error' ? 'bg-red-500 text-white' : 'bg-green-500 text-white'
+            }`}
           role="alert"
         >
           <span>{toast.message}</span>
