@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import { CheckCircle, Circle, Download, FileText, X, RefreshCw } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
-import { check } from '@tauri-apps/plugin-updater';
-import { relaunch } from '@tauri-apps/plugin-process';
+// import { check } from '@tauri-apps/plugin-updater';
+// import { relaunch } from '@tauri-apps/plugin-process';
 
 interface DependencyCheck {
   name: string;
@@ -66,7 +66,9 @@ export default function DependencyCheckScreen({ onComplete }: DependencyCheckScr
     version?: string;
     error?: string;
   }>({ checking: false, available: false, downloading: false });
-  // Check for updates
+  // Check for updates - Disabled for now until first release is published
+  // Once you publish your first release, uncomment this to enable automatic update checks
+  /*
   useEffect(() => {
     const checkForUpdates = async () => {
       setUpdateStatus({ checking: true, available: false, downloading: false });
@@ -96,6 +98,7 @@ export default function DependencyCheckScreen({ onComplete }: DependencyCheckScr
 
     checkForUpdates();
   }, []);
+  */
 
   useEffect(() => {
     const checkDependencies = async () => {
@@ -177,6 +180,7 @@ export default function DependencyCheckScreen({ onComplete }: DependencyCheckScr
     // You can implement actual installation logic here
   };
 
+  /* Temporarily disabled until first release is published
   const handleDownloadUpdate = async () => {
     setUpdateStatus((prev) => ({ ...prev, downloading: true }));
     try {
@@ -194,6 +198,7 @@ export default function DependencyCheckScreen({ onComplete }: DependencyCheckScr
       }));
     }
   };
+  */
 
   // Can proceed if Bun and Gemini CLI are installed
   const canProceed =
@@ -212,7 +217,8 @@ export default function DependencyCheckScreen({ onComplete }: DependencyCheckScr
           </p>
         </div>
 
-        {/* Update notification */}
+        {/* Update notification - Disabled until first release */}
+        {/* Uncomment this block after publishing your first release
         {updateStatus.available && (
           <div className="mb-6 p-4 bg-blue-900/50 border border-blue-700 rounded-lg">
             <div className="flex items-center justify-between">
@@ -245,6 +251,7 @@ export default function DependencyCheckScreen({ onComplete }: DependencyCheckScr
             </div>
           </div>
         )}
+        */}
 
         <div className="space-y-4">
           {dependencies.map((dep) => (
