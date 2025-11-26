@@ -50,7 +50,7 @@ export default function Header({
   onCreateBackup,
 }: HeaderProps) {
   const [showTooltip, setShowTooltip] = useState<string | null>(null);
-  const [tooltipTimer, setTooltipTimer] = useState<NodeJS.Timeout | null>(null);
+  const [tooltipTimer, setTooltipTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
 
   // console.log('Header metadata:', metadata);
   // console.log("lastAutoSave:", lastAutoSave);
@@ -171,13 +171,13 @@ export default function Header({
               aria-label="Salvar como... (Ctrl+Shift+S)"
             >
               <Save className="w-4 h-4" aria-hidden="true" />
-                            <span className="text-sm">Salvar Como...</span>
-                          </button>
-                                      <button
-                                        onClick={onOpenTerminal}                            className="flex items-center space-x-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-md transition-colors focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-                            aria-label="Abrir terminal"
-                          >
-                <span className="text-sm">Abrir Terminal</span>
+              <span className="text-sm">Salvar Como...</span>
+            </button>
+            <button
+              onClick={onOpenTerminal} className="flex items-center space-x-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-md transition-colors focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+              aria-label="Abrir terminal"
+            >
+              <span className="text-sm">Abrir Terminal</span>
             </button>
             <button
               onClick={onToggleTerminal}
@@ -187,12 +187,12 @@ export default function Header({
               <span className="text-sm">Toggle Terminal</span>
             </button>
           </div>
-                      </div>
-                    </header>
-                  </>
-                );
-              }
-              
-              async function handleOpenTerminal() {
-                await invoke('open_terminal');
-              }
+        </div>
+      </header>
+    </>
+  );
+}
+
+async function handleOpenTerminal() {
+  await invoke('open_terminal');
+}
