@@ -2,7 +2,9 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main-capability",
   "description": "Capability for the main window",
-  "windows": ["main"],
+  "windows": [
+    "main"
+  ],
   "permissions": [
     "fs:default",
     {
@@ -27,11 +29,11 @@
     "dialog:allow-open",
     "dialog:allow-save",
     "shell:allow-spawn",
-
     "core:default",
     "core:event:allow-listen",
     "core:event:allow-emit",
     "core:event:allow-emit-to",
-    "dialog:default"
+    "dialog:default",
+    "updater:default"
   ]
 }
