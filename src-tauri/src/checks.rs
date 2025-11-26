@@ -150,13 +150,9 @@ fn check_command_internal(command: &str, args: &[&str], name: &str) -> Dependenc
 
     // On Windows, ensure we have the right environment
     if cfg!(target_os = "windows") {
-        // Add common Node.js installation paths to PATH if not already present
+        // Add Bun installation path to PATH if not already present
         if let Ok(current_path) = env::var("PATH") {
-            let additional_paths = vec![
-                r"C:\Program Files\nodejs",
-                r"C:\Program Files (x86)\nodejs",
-                r"C:\Users\%USERNAME%\AppData\Roaming\npm",
-            ];
+            let additional_paths = vec![r"C:\Users\%USERNAME%\.bun\bin"];
 
             let mut new_path = current_path.clone();
             for path in additional_paths {
