@@ -25,25 +25,6 @@ interface DependencyCheckScreenProps {
   onComplete: () => void;
 }
 
-interface DependencyCheck {
-  name: string;
-  status: 'checking' | 'installed' | 'missing';
-  description: string;
-  version?: string;
-  error?: string;
-}
-
-interface DependencyResult {
-  name: string;
-  installed: boolean;
-  version?: string;
-  error?: string;
-}
-
-interface DependencyCheckScreenProps {
-  onComplete: () => void;
-}
-
 export default function DependencyCheckScreen({ onComplete }: DependencyCheckScreenProps) {
   const [dependencies, setDependencies] = useState<DependencyCheck[]>([
     {
@@ -159,25 +140,48 @@ export default function DependencyCheckScreen({ onComplete }: DependencyCheckScr
         }
       }
 
-      // Se Gemini CLI estiver instalado, inicia o processo
-      const geminiDep = dependencies.find(dep => dep.name === 'Gemini CLI');
-      if (geminiDep && geminiDep.status === 'installed') {
-        try {
-          await invoke('start_gemini_cli');
-          console.log('Gemini CLI iniciado com sucesso');
-        } catch (e) {
-          console.error('Falha ao iniciar Gemini CLI:', e);
-        }
-      }
       setIsChecking(false);
     };
 
     checkDependencies();
   }, []);
 
-  const handleInstallGemini = () => {
-    console.log('Iniciando instalação do Gemini CLI...');
-    // You can implement actual installation logic here
+  // Auto-start Gemini CLI when it's detected as installed
+  useEffect(() => {
+    const geminiDep = dependencies.find((dep) => dep.name === 'Gemini CLI');
+    if (geminiDep && geminiDep.status === 'installed') {
+      const startGemini = async () => {
+        try {
+          await invoke('start_gemini_cli');
+          console.log('Gemini CLI iniciado com sucesso');
+        } catch (e) {
+          console.error('Falha ao iniciar Gemini CLI:', e);
+        }
+      };
+      startGemini();
+    }
+  }, [dependencies]);
+
+  const handleInstallBun = async () => {
+    console.log('Instalando Bun...');
+    try {
+      await invoke('install_bun');
+      // Re-check dependencies after installation
+      window.location.reload();
+    } catch (error) {
+      console.error('Falha ao instalar Bun:', error);
+    }
+  };
+
+  const handleInstallGemini = async () => {
+    console.log('Instalando Gemini CLI...');
+    try {
+      await invoke('install_gemini');
+      // Re-check dependencies after installation
+      window.location.reload();
+    } catch (error) {
+      console.error('Falha ao instalar Gemini CLI:', error);
+    }
   };
 
   /* Temporarily disabled until first release is published
@@ -271,9 +275,9 @@ export default function DependencyCheckScreen({ onComplete }: DependencyCheckScr
                 <p className="text-xs text-gray-400">{dep.description}</p>
                 {dep.error && <p className="text-xs text-red-400 mt-1">Erro: {dep.error}</p>}
               </div>
-              {dep.status === 'missing' && dep.name === 'Gemini CLI' && (
+              {dep.status === 'missing' && (
                 <button
-                  onClick={handleInstallGemini}
+                  onClick={dep.name === 'Bun' ? handleInstallBun : handleInstallGemini}
                   className="flex items-center space-x-1 px-3 py-1 bg-blue-600 text-white text-xs rounded-md hover:bg-blue-700 transition-colors"
                 >
                   <Download className="w-3 h-3" />
