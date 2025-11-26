@@ -23,7 +23,7 @@ export function useFileHandler() {
     currentVersionIndex: -1,
   });
 
-  const autoSaveTimer = useRef<NodeJS.Timeout | null>(null);
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingContent = useRef<string>('');
 
   // Auto-save functionality
@@ -166,8 +166,8 @@ export function useFileHandler() {
       const version = state.versions[state.currentVersionIndex - 1];
       const result = await FileService.getDocumentVersion(state.currentFilePath, version);
       if (result.success) {
-        setState(prev => ({ 
-          ...prev, 
+        setState(prev => ({
+          ...prev,
           metadata: result.metadata || prev.metadata,
           currentVersionIndex: prev.currentVersionIndex - 1,
         }));
@@ -185,8 +185,8 @@ export function useFileHandler() {
       const version = state.versions[state.currentVersionIndex + 1];
       const result = await FileService.getDocumentVersion(state.currentFilePath, version);
       if (result.success) {
-        setState(prev => ({ 
-          ...prev, 
+        setState(prev => ({
+          ...prev,
           metadata: result.metadata || prev.metadata,
           currentVersionIndex: prev.currentVersionIndex + 1,
         }));
