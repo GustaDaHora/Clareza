@@ -2,7 +2,7 @@
 
 [package]
 name = "clareza"
-version = "0.1.3"
+version = "0.1.4"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
@@ -32,3 +32,4 @@ tauri-plugin-fs = "2"
 tauri-plugin-dialog = "2"
 once_cell = "1.21.3"
 fix-path-env = { git = "https://github.com/tauri-apps/fix-path-env-rs" }
+tauri-plugin-process = "2.3.1"
