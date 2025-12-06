@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import { CheckCircle, Circle, Download, FileText, X, RefreshCw } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
-// import { check } from '@tauri-apps/plugin-updater';
-// import { relaunch } from '@tauri-apps/plugin-process';
+import { check } from '@tauri-apps/plugin-updater';
+import { relaunch } from '@tauri-apps/plugin-process';
 
 interface DependencyCheck {
   name: string;
@@ -47,9 +47,8 @@ export default function DependencyCheckScreen({ onComplete }: DependencyCheckScr
     version?: string;
     error?: string;
   }>({ checking: false, available: false, downloading: false });
-  // Check for updates - Disabled for now until first release is published
-  // Once you publish your first release, uncomment this to enable automatic update checks
-  /*
+
+  // Check for updates
   useEffect(() => {
     const checkForUpdates = async () => {
       setUpdateStatus({ checking: true, available: false, downloading: false });
@@ -79,7 +78,6 @@ export default function DependencyCheckScreen({ onComplete }: DependencyCheckScr
 
     checkForUpdates();
   }, []);
-  */
 
   useEffect(() => {
     const checkDependencies = async () => {
@@ -184,7 +182,6 @@ export default function DependencyCheckScreen({ onComplete }: DependencyCheckScr
     }
   };
 
-  /* Temporarily disabled until first release is published
   const handleDownloadUpdate = async () => {
     setUpdateStatus((prev) => ({ ...prev, downloading: true }));
     try {
@@ -202,7 +199,6 @@ export default function DependencyCheckScreen({ onComplete }: DependencyCheckScr
       }));
     }
   };
-  */
 
   // Can proceed if Bun and Gemini CLI are installed
   const canProceed =
@@ -221,17 +217,14 @@ export default function DependencyCheckScreen({ onComplete }: DependencyCheckScr
           </p>
         </div>
 
-        {/* Update notification - Disabled until first release */}
-        {/* Uncomment this block after publishing your first release
+        {/* Update notification */}
         {updateStatus.available && (
           <div className="mb-6 p-4 bg-blue-900/50 border border-blue-700 rounded-lg">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <RefreshCw className="w-5 h-5 text-blue-400" />
                 <div>
-                  <p className="text-blue-300 font-medium text-sm">
-                    Atualização disponível: v{updateStatus.version}
-                  </p>
+                  <p className="text-blue-300 font-medium text-sm">Atualização disponível: v{updateStatus.version}</p>
                   <p className="text-blue-400 text-xs">Uma nova versão do Clareza está disponível</p>
                 </div>
               </div>
@@ -255,7 +248,6 @@ export default function DependencyCheckScreen({ onComplete }: DependencyCheckScr
             </div>
           </div>
         )}
-        */}
 
         <div className="space-y-4">
           {dependencies.map((dep) => (
