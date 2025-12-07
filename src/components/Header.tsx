@@ -2,13 +2,7 @@
 
 import { invoke } from '@tauri-apps/api/core';
 import { useState, useEffect } from 'react';
-import {
-  FileText,
-  FolderOpen,
-  Save,
-  ChevronLeft,
-  ChevronRight,
-} from 'lucide-react';
+import { FileText, FolderOpen, Save, ChevronLeft, ChevronRight } from 'lucide-react';
 import { TOOLTIP_DELAY } from '../constants';
 import type { DocumentMetadata } from '../types';
 
@@ -54,7 +48,7 @@ export default function Header({
 
   // console.log('Header metadata:', metadata);
   // console.log("lastAutoSave:", lastAutoSave);
-  // console.log("onCreateBackup:", onCreateBackup);  
+  // console.log("onCreateBackup:", onCreateBackup);
 
   useEffect(() => {
     return () => {
@@ -86,7 +80,6 @@ export default function Header({
             <div className="flex items-center space-x-2">
               <FileText className="w-6 h-6 text-blue-400" aria-hidden="true" />
               <h1 className="text-lg font-semibold text-white">Clareza</h1>
-
             </div>
             <div className="flex items-center space-x-2 ml-8">
               <div className="relative">
@@ -136,14 +129,13 @@ export default function Header({
           </div>
           <div className="flex-1 text-center">
             {currentFilePath && (
-              <span className="text-sm text-gray-400 font-semibold">
-                {currentFilePath.split('/').pop()}
+              <span className="text-lg text-gray-200 font-bold">
+                {currentFilePath.replace(/^.*[\\/]/, '')}
                 {isDirty && ' *'}
               </span>
             )}
           </div>
           <div className="flex items-center space-x-2">
-
             <button
               onClick={onOpen}
               disabled={isLoading}
@@ -160,9 +152,7 @@ export default function Header({
               aria-label="Salvar arquivo (Ctrl+S)"
             >
               <Save className="w-4 h-4" aria-hidden="true" />
-              <span className="text-sm">
-                {isLoading ? 'Salvando...' : isDirty ? 'Salvar' : 'Salvo'}
-              </span>
+              <span className="text-sm">{isLoading ? 'Salvando...' : isDirty ? 'Salvar' : 'Salvo'}</span>
             </button>
             <button
               onClick={onSaveAs}
@@ -174,7 +164,8 @@ export default function Header({
               <span className="text-sm">Salvar Como...</span>
             </button>
             <button
-              onClick={onOpenTerminal} className="flex items-center space-x-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-md transition-colors focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+              onClick={onOpenTerminal}
+              className="flex items-center space-x-2 px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-md transition-colors focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
               aria-label="Abrir terminal"
             >
               <span className="text-sm">Abrir Terminal</span>
