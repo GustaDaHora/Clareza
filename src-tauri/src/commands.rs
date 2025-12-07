@@ -139,12 +139,33 @@ pub async fn save_document(
 
     FileUtils::atomic_write(&safe_path, &final_content).await?;
 
-    // Create a new version
+    // Check if we should create a new version
     let versions_dir = FileUtils::get_versions_dir(&safe_path)?;
     tokio::fs::create_dir_all(&versions_dir).await?;
-    let timestamp = Utc::now().to_rfc3339().replace(":", "-");
-    let version_path = versions_dir.join(timestamp);
-    tokio::fs::write(version_path, &final_content).await?;
+
+    let mut should_create_version = true;
+    let mut entries = tokio::fs::read_dir(&versions_dir).await?;
+    let mut versions = Vec::new();
+    while let Some(entry) = entries.next_entry().await? {
+        versions.push(entry.path());
+    }
+
+    // Sort to get the latest version
+    versions.sort();
+
+    if let Some(latest_version) = versions.last() {
+        if let Ok(latest_content) = FileUtils::read_with_encoding(latest_version).await {
+            if latest_content == final_content {
+                should_create_version = false;
+            }
+        }
+    }
+
+    if should_create_version {
+        let timestamp = Utc::now().to_rfc3339().replace(":", "-");
+        let version_path = versions_dir.join(timestamp);
+        tokio::fs::write(version_path, &final_content).await?;
+    }
 
     Ok(FileOperation {
         success: true,
