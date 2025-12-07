@@ -110,6 +110,8 @@ export function useFileHandler() {
           isDirty: false,
           metadata: result.metadata || undefined,
           isLoading: false,
+          versions: [],
+          currentVersionIndex: -1,
         }));
         if (result.path) fetchVersions(result.path);
       }
