@@ -61,7 +61,10 @@ impl FileUtils {
         let parent = original_path
             .parent()
             .ok_or_else(|| ClarezaError::Path("Cannot determine parent directory".to_string()))?;
-        Ok(parent.join(".clareza_versions"))
+        let file_name = original_path
+            .file_name()
+            .ok_or_else(|| ClarezaError::Path("Invalid file name".to_string()))?;
+        Ok(parent.join(".clareza_versions").join(file_name))
     }
     pub async fn read_with_encoding<P: AsRef<Path>>(path: P) -> Result<String, ClarezaError> {
         let bytes = tokio::fs::read(path).await?;
