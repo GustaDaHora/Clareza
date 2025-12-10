@@ -144,25 +144,53 @@ fn check_command_through_cmd(full_command: &str, name: &str) -> DependencyResult
 }
 
 fn check_command_internal(command: &str, args: &[&str], name: &str) -> DependencyResult {
-    // Set up environment to include common paths
-    let mut cmd = Command::new(command);
+    // Determine the home directory and potential bun path
+    let home_dir = if cfg!(target_os = "windows") {
+        env::var("USERPROFILE").ok()
+    } else {
+        env::var("HOME").ok()
+    };
+
+    let mut command_path = command.to_string();
+    let mut env_path_update = None;
+
+    if let Some(home) = &home_dir {
+        let bun_join = std::path::Path::new(home).join(".bun").join("bin");
+        let bun_bin_str = bun_join.to_string_lossy().to_string();
+
+        // Check if the command exists in bun bin dir
+        let potential_cmd = if cfg!(target_os = "windows") {
+            if command.ends_with(".exe") || command.ends_with(".cmd") {
+                bun_join.join(command)
+            } else {
+                bun_join.join(format!("{}.exe", command))
+            }
+        } else {
+            bun_join.join(command)
+        };
+
+        if potential_cmd.exists() {
+            command_path = potential_cmd.to_string_lossy().to_string();
+        }
+
+        // Prepare PATH update
+        if let Ok(current_path) = env::var("PATH") {
+            if !current_path.contains(&bun_bin_str) {
+                let separator = if cfg!(target_os = "windows") {
+                    ";"
+                } else {
+                    ":"
+                };
+                env_path_update = Some(format!("{}{}{}", bun_bin_str, separator, current_path));
+            }
+        }
+    }
+
+    let mut cmd = Command::new(&command_path);
     cmd.args(args);
 
-    // On Windows, ensure we have the right environment
-    if cfg!(target_os = "windows") {
-        // Add Bun installation path to PATH if not already present
-        if let Ok(current_path) = env::var("PATH") {
-            let additional_paths = vec![r"C:\Users\%USERNAME%\.bun\bin"];
-
-            let mut new_path = current_path.clone();
-            for path in additional_paths {
-                if !current_path.to_lowercase().contains(&path.to_lowercase()) {
-                    new_path.push(';');
-                    new_path.push_str(path);
-                }
-            }
-            cmd.env("PATH", new_path);
-        }
+    if let Some(new_path) = env_path_update {
+        cmd.env("PATH", new_path);
     }
 
     match cmd.output() {
@@ -240,5 +268,85 @@ fn extract_version(output: &str) -> String {
         first_line[..space_pos].to_string()
     } else {
         first_line.to_string()
+    }
+}
+
+#[tauri::command]
+pub async fn install_bun() -> Result<(), String> {
+    let (shell, shell_arg, install_cmd) = if cfg!(target_os = "windows") {
+        ("powershell", "-c", "irm bun.sh/install.ps1 | iex")
+    } else {
+        ("bash", "-c", "curl -fsSL https://bun.sh/install | bash")
+    };
+
+    println!(
+        "Installing Bun via: {} {} {}",
+        shell, shell_arg, install_cmd
+    );
+
+    let output = std::process::Command::new(shell)
+        .arg(shell_arg)
+        .arg(install_cmd)
+        .output()
+        .map_err(|e| format!("Failed to execute installation command: {}", e))?;
+
+    if output.status.success() {
+        Ok(())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+        Err(format!(
+            "Bun installation failed. Stdout: {}, Stderr: {}",
+            stdout, stderr
+        ))
+    }
+}
+
+#[tauri::command]
+pub async fn install_gemini() -> Result<crate::models::FileOperation, String> {
+    let (shell, shell_arg) = if cfg!(target_os = "windows") {
+        ("cmd", "/C")
+    } else {
+        ("sh", "-c")
+    };
+
+    // Need to find bun first because it might not be in PATH yet if just installed
+    let bun_path = if cfg!(target_os = "windows") {
+        let user_profile = env::var("USERPROFILE").unwrap_or_default();
+        let path = std::path::Path::new(&user_profile).join(".bun/bin/bun.exe");
+        if path.exists() {
+            path.to_string_lossy().to_string()
+        } else {
+            "bun".to_string()
+        }
+    } else {
+        let home = env::var("HOME").unwrap_or_default();
+        let path = std::path::Path::new(&home).join(".bun/bin/bun");
+        if path.exists() {
+            path.to_string_lossy().to_string()
+        } else {
+            "bun".to_string()
+        }
+    };
+
+    println!("Installing Gemini CLI using: {}", bun_path);
+
+    let output = std::process::Command::new(shell)
+        .arg(shell_arg)
+        .arg(format!("{} add -g @google/gemini-cli", bun_path))
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if output.status.success() {
+        Ok(crate::models::FileOperation {
+            success: true,
+            message: "Gemini CLI installed successfully".to_string(),
+            path: None,
+            content: None,
+            metadata: None,
+        })
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        Err(format!("Failed to install Gemini CLI: {}", stderr))
     }
 }
