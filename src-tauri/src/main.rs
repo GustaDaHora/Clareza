@@ -14,12 +14,12 @@ fn ping() -> String {
     "pong".into()
 }
 
-use checks::{check_bun, check_gemini};
+use checks::{check_bun, check_gemini, install_bun, install_gemini};
 
 use commands::{
     create_backup, create_document, debug_get_path, get_document_version, get_document_versions,
-    get_recent_files, install_bun, install_gemini, list_backups, open_document, open_terminal,
-    restore_backup, save_document, save_document_as, show_open_dialog, validate_path,
+    get_recent_files, list_backups, open_document, open_terminal, restore_backup, save_document,
+    save_document_as, show_open_dialog, validate_path,
 };
 
 use gemini::{get_gemini_model, send_prompt_to_gemini, set_gemini_model};
