@@ -168,6 +168,13 @@ export default function DependencyCheckScreen({ onComplete }: DependencyCheckScr
       window.location.reload();
     } catch (error) {
       console.error('Falha ao instalar Bun:', error);
+      // Redirect to official website on failure as requested
+      await invoke('open_browser_url', { url: 'https://bun.sh' }).catch(() => {
+        // Fallback if we can't open browser via backend command (if it existed)
+        // But since we are in a webview, valid window.open might work or we use a shell command
+        window.open('https://bun.sh', '_blank');
+      });
+      alert('Falha ao instalar o Bun automaticamente. Redirecionando para o site oficial para instalação manual.');
     }
   };
 
